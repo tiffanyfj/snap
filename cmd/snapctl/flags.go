@@ -43,6 +43,10 @@ var (
 		Name:  "running",
 		Usage: "Shows running plugins",
 	}
+	flPassword = cli.BoolFlag{
+		Name:  "password, p",
+		Usage: "Use basic http password auth",
+	}
 
 	// Plugin flags
 	flPluginAsc = cli.StringFlag{

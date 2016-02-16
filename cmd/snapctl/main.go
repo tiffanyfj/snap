@@ -21,12 +21,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"sort"
 	"time"
 
 	"github.com/codegangsta/cli"
 	"github.com/intelsdi-x/snap/mgmt/rest/client"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -40,7 +42,7 @@ func main() {
 	app.Name = "snapctl"
 	app.Version = gitversion
 	app.Usage = "A powerful telemetry framework"
-	app.Flags = []cli.Flag{flURL, flSecure, flAPIVer}
+	app.Flags = []cli.Flag{flURL, flSecure, flAPIVer, flPassword}
 	app.Commands = commands
 	sort.Sort(ByCommand(app.Commands))
 	app.Run(os.Args)
@@ -57,7 +59,7 @@ func init() {
 	url := flURL.Value
 	ver := flAPIVer.Value
 	secure := false
-
+	pass := false
 	for idx, a := range os.Args {
 		switch a {
 		case "--url":
@@ -88,9 +90,26 @@ func init() {
 			if err := f1.Parse([]string{os.Args[idx]}); err == nil {
 				secure = *prti
 			}
+		case "--password":
+			pass = true
+		case "-p":
+			pass = true
 		}
 	}
+
 	pClient = client.New(url, ver, secure)
+	if pass {
+		// Prompt for password
+		fmt.Print("Password:")
+		password, err := terminal.ReadPassword(0)
+		if err != nil {
+			pClient.Password = ""
+		} else {
+			pClient.Password = string(password)
+		}
+		// Go to next line after password prompt
+		fmt.Println()
+	}
 	resp := pClient.ListAgreements()
 	if resp.Err == nil {
 		commands = append(commands, tribeCommands...)
