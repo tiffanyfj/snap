@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/negroni"
 	"github.com/julienschmidt/httprouter"
@@ -98,15 +100,17 @@ type managesConfig interface {
 }
 
 type Server struct {
-	mm   managesMetrics
-	mt   managesTasks
-	tr   managesTribe
-	mc   managesConfig
-	n    *negroni.Negroni
-	r    *httprouter.Router
-	tls  *tls
-	addr net.Addr
-	err  chan error
+	mm      managesMetrics
+	mt      managesTasks
+	tr      managesTribe
+	mc      managesConfig
+	n       *negroni.Negroni
+	r       *httprouter.Router
+	tls     *tls
+	auth    bool
+	authpwd []byte
+	addr    net.Addr
+	err     chan error
 }
 
 func New(https bool, cpath, kpath string) (*Server, error) {
@@ -124,15 +128,42 @@ func New(https bool, cpath, kpath string) (*Server, error) {
 	}
 
 	restLogger.Info(fmt.Sprintf("Configuring REST API with HTTPS set to: %v", https))
-
 	s.n = negroni.New(
 		NewLogger(),
 		negroni.NewRecovery(),
+		negroni.HandlerFunc(s.Middleware),
 	)
 	s.r = httprouter.New()
 	// Use negroni to handle routes
 	s.n.UseHandler(s.r)
 	return s, nil
+}
+
+// SetAPIAuth sets API authentication to enabled or disabled
+func (s *Server) SetAPIAuth(auth bool) {
+	s.auth = auth
+}
+
+// SetAPIAuthHashedPwd sets the API authentication password from snapd
+func (s *Server) SetAPIAuthHashedPwd(pwd []byte) {
+	s.authpwd = pwd
+}
+
+// Middleware for REST API
+func (s *Server) Middleware(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	if s.auth {
+		_, password, ok := r.BasicAuth()
+		defer r.Body.Close()
+		err := bcrypt.CompareHashAndPassword(s.authpwd, []byte(password))
+		if ok && err == nil {
+			next(rw, r)
+		} else {
+			http.Error(rw, "Not Authorized", 401)
+			restLogger.Fatal(err)
+		}
+	} else {
+		next(rw, r)
+	}
 }
 
 func (s *Server) Start(addrString string) {

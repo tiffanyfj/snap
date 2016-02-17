@@ -31,6 +31,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 
@@ -116,6 +118,14 @@ var (
 		Name:  "rest-key",
 		Usage: "A path to a key file to use for HTTPS deployment of snap's REST API",
 	}
+	flRestAuth = cli.BoolFlag{
+		Name:  "rest-auth",
+		Usage: "Enables snap's REST API authentication",
+	}
+	flrestAuthPwd = cli.StringFlag{
+		Name:  "rest-auth-pwd",
+		Usage: "A password to authenticate snap's REST API",
+	}
 
 	gitversion  string
 	coreModules []coreModule
@@ -183,6 +193,8 @@ func main() {
 		flConfig,
 		flRestHTTPS,
 		flRestKey,
+		flRestAuth,
+		flrestAuthPwd,
 	}
 	app.Flags = append(app.Flags, tribe.Flags...)
 
@@ -243,6 +255,8 @@ func action(ctx *cli.Context) {
 	restHTTPS := globalconfig.GetFlagBool(ctx, fcfg.Flags.RestHTTPS, "rest-https")
 	restKey := globalconfig.GetFlagString(ctx, fcfg.Flags.RestKey, "rest-key")
 	restCert := globalconfig.GetFlagString(ctx, fcfg.Flags.RestCert, "rest-cert")
+	restAuth := globalconfig.GetFlagBool(ctx, fcfg.Flags.RestAuth, "rest-auth")
+	restAuthPwd := globalconfig.GetFlagString(ctx, fcfg.Flags.RestAuthPwd, "rest-auth-pwd")
 
 	controlOpts := []control.PluginControlOpt{
 		control.MaxRunningPlugins(maxRunning),
@@ -479,14 +493,29 @@ func action(ctx *cli.Context) {
 		r.BindMetricManager(c)
 		r.BindConfigManager(c.Config)
 		r.BindTaskManager(s)
+		//Rest Authentication
+		if restAuth {
+			log.Info("REST API authentication is enabled")
+			r.SetAPIAuth(restAuth)
+			if restAuthPwd != "" {
+				log.Info("REST API authentication password is set")
+				hashedPwd, err := bcrypt.GenerateFromPassword([]byte(restAuthPwd), bcrypt.DefaultCost)
+				if err != nil {
+					log.Fatal("Unable to hash password from snapctl: ", err.Error)
+				}
+				r.SetAPIAuthHashedPwd(hashedPwd)
+			} else {
+				log.Fatal("REST API authentication is enabled so password is needed")
+			}
+		}
 		if tr != nil {
 			r.BindTribeManager(tr)
 		}
 		go monitorErrors(r.Err())
 		r.Start(fmt.Sprintf(":%d", apiPort))
-		log.Info("Rest API is enabled")
+		log.Info("REST API is enabled")
 	} else {
-		log.Info("Rest API is disabled")
+		log.Info("REST API is disabled")
 	}
 
 	log.WithFields(
