@@ -44,6 +44,7 @@ import (
 	"github.com/intelsdi-x/snap/mgmt/tribe/agreement"
 	"github.com/intelsdi-x/snap/pkg/globalconfig"
 	"github.com/intelsdi-x/snap/scheduler"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -122,10 +123,6 @@ var (
 		Name:  "rest-auth",
 		Usage: "Enables snap's REST API authentication",
 	}
-	flrestAuthPwd = cli.StringFlag{
-		Name:  "rest-auth-pwd",
-		Usage: "A password to authenticate snap's REST API",
-	}
 
 	gitversion  string
 	coreModules []coreModule
@@ -194,7 +191,6 @@ func main() {
 		flRestHTTPS,
 		flRestKey,
 		flRestAuth,
-		flrestAuthPwd,
 	}
 	app.Flags = append(app.Flags, tribe.Flags...)
 
@@ -256,7 +252,6 @@ func action(ctx *cli.Context) {
 	restKey := globalconfig.GetFlagString(ctx, fcfg.Flags.RestKey, "rest-key")
 	restCert := globalconfig.GetFlagString(ctx, fcfg.Flags.RestCert, "rest-cert")
 	restAuth := globalconfig.GetFlagBool(ctx, fcfg.Flags.RestAuth, "rest-auth")
-	restAuthPwd := globalconfig.GetFlagString(ctx, fcfg.Flags.RestAuthPwd, "rest-auth-pwd")
 
 	controlOpts := []control.PluginControlOpt{
 		control.MaxRunningPlugins(maxRunning),
@@ -497,15 +492,19 @@ func action(ctx *cli.Context) {
 		if restAuth {
 			log.Info("REST API authentication is enabled")
 			r.SetAPIAuth(restAuth)
-			if restAuthPwd != "" {
+			// Auth requested -- Prompt for password
+			fmt.Print("Password:")
+			password, err := terminal.ReadPassword(0)
+			fmt.Println()
+			if err == nil {
 				log.Info("REST API authentication password is set")
-				hashedPwd, err := bcrypt.GenerateFromPassword([]byte(restAuthPwd), bcrypt.DefaultCost)
+				hashedPwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 				if err != nil {
 					log.Fatal("Unable to hash password from snapctl: ", err.Error)
 				}
 				r.SetAPIAuthHashedPwd(hashedPwd)
 			} else {
-				log.Fatal("REST API authentication is enabled so password is needed")
+				log.Fatal("Failed to get Credentials")
 			}
 		}
 		if tr != nil {
