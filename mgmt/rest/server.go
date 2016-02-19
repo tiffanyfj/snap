@@ -131,7 +131,7 @@ func New(https bool, cpath, kpath string) (*Server, error) {
 	s.n = negroni.New(
 		NewLogger(),
 		negroni.NewRecovery(),
-		negroni.HandlerFunc(s.Middleware),
+		negroni.HandlerFunc(s.authMiddleware),
 	)
 	s.r = httprouter.New()
 	// Use negroni to handle routes
@@ -149,13 +149,16 @@ func (s *Server) SetAPIAuthHashedPwd(pwd []byte) {
 	s.authpwd = pwd
 }
 
-// Middleware for REST API
-func (s *Server) Middleware(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+// Auth Middleware for REST API
+func (s *Server) authMiddleware(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	if s.auth {
 		_, password, ok := r.BasicAuth()
 		defer r.Body.Close()
 		err := bcrypt.CompareHashAndPassword(s.authpwd, []byte(password))
-		if ok && err == nil {
+		// If we have valid password or going to tribe/agreements endpoint
+		// go to next. tribe/agreements endpoint used for populating
+		// snapctl help page when tribe mode is turned on.
+		if (ok && err == nil) || r.RequestURI == "/v1/tribe/agreements" {
 			next(rw, r)
 		} else {
 			http.Error(rw, "Not Authorized", 401)

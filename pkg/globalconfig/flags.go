@@ -52,6 +52,7 @@ type flagConfig struct {
 	RestKey          *string `json:"rest-key"`
 	RestCert         *string `json:"rest-cert"`
 	RestAuth         *bool   `json:"rest-auth"`
+	RestAuthPwd      *string `json:"rest-auth-pwd"`
 }
 
 // NewConfig returns a reference to a global config type for the snap daemon

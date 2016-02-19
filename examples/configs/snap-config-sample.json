@@ -4,7 +4,7 @@
         "plugin-trust": 0,
         "auto-discover": "build/plugin",
         "rest-auth": true,
-        "rest-auth-pwd": "p"
+        "rest-auth-pwd": "example"
     },    
     "plugins": {
         "all": {

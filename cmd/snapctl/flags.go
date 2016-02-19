@@ -47,6 +47,12 @@ var (
 		Name:  "password, p",
 		Usage: "Use basic http password auth",
 	}
+	flPasswordPath = cli.StringFlag{
+		Name:   "Password, P",
+		EnvVar: "SNAPCTL_PASS_PATH",
+		Usage:  "Provide a path to a file that contains the password to use",
+		Value:  "",
+	}
 
 	// Plugin flags
 	flPluginAsc = cli.StringFlag{

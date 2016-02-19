@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/ssh/terminal"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -44,7 +45,6 @@ import (
 	"github.com/intelsdi-x/snap/mgmt/tribe/agreement"
 	"github.com/intelsdi-x/snap/pkg/globalconfig"
 	"github.com/intelsdi-x/snap/scheduler"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -252,6 +252,7 @@ func action(ctx *cli.Context) {
 	restKey := globalconfig.GetFlagString(ctx, fcfg.Flags.RestKey, "rest-key")
 	restCert := globalconfig.GetFlagString(ctx, fcfg.Flags.RestCert, "rest-cert")
 	restAuth := globalconfig.GetFlagBool(ctx, fcfg.Flags.RestAuth, "rest-auth")
+	restAuthPwd := globalconfig.GetFlagString(ctx, fcfg.Flags.RestAuthPwd, "rest-auth-pwd")
 
 	controlOpts := []control.PluginControlOpt{
 		control.MaxRunningPlugins(maxRunning),
@@ -492,20 +493,26 @@ func action(ctx *cli.Context) {
 		if restAuth {
 			log.Info("REST API authentication is enabled")
 			r.SetAPIAuth(restAuth)
-			// Auth requested -- Prompt for password
-			fmt.Print("Password:")
-			password, err := terminal.ReadPassword(0)
-			fmt.Println()
-			if err == nil {
-				log.Info("REST API authentication password is set")
-				hashedPwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+			var password []byte
+			// Auth requested and not provided as part of config
+			if restAuthPwd == "" {
+				fmt.Println("What password do you want to use for authentication?")
+				fmt.Print("Password:")
+				password, err = terminal.ReadPassword(0)
+				fmt.Println()
 				if err != nil {
-					log.Fatal("Unable to hash password from snapctl: ", err.Error)
+					log.Fatal("Failed to get Credentials")
 				}
-				r.SetAPIAuthHashedPwd(hashedPwd)
 			} else {
-				log.Fatal("Failed to get Credentials")
+				// restAuthPwd provided in config file
+				password = []byte(restAuthPwd)
 			}
+			log.Info("REST API authentication password is set")
+			hashedPwd, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
+			if err != nil {
+				log.Fatal("Unable to hash password from snapctl: ", err.Error)
+			}
+			r.SetAPIAuthHashedPwd(hashedPwd)
 		}
 		if tr != nil {
 			r.BindTribeManager(tr)

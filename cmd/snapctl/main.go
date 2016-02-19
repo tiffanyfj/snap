@@ -22,8 +22,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/codegangsta/cli"
@@ -42,7 +44,7 @@ func main() {
 	app.Name = "snapctl"
 	app.Version = gitversion
 	app.Usage = "A powerful telemetry framework"
-	app.Flags = []cli.Flag{flURL, flSecure, flAPIVer, flPassword}
+	app.Flags = []cli.Flag{flURL, flSecure, flAPIVer, flPassword, flPasswordPath}
 	app.Commands = commands
 	sort.Sort(ByCommand(app.Commands))
 	app.Run(os.Args)
@@ -55,11 +57,29 @@ func init() {
 	prtAv := f1.String("api-version", flAPIVer.Value, flAPIVer.Usage)
 	prtA := f1.String("a", flAPIVer.Value, flAPIVer.Usage)
 	prti := f1.Bool("insecure", false, flSecure.Usage)
+	prtPath := f1.String("Password", "", flPasswordPath.Usage)
+	prtP := f1.String("P", "", flPasswordPath.Usage)
 
 	url := flURL.Value
 	ver := flAPIVer.Value
 	secure := false
-	pass := false
+	passPrompt := false
+	passPathProvided := false
+	passPath := ""
+	help := false
+
+	if len(os.Args) == 1 {
+		help = true
+	}
+	// get password path from env variable but overwrite
+	// if value passed as flag for either a path to a password
+	// file or a for a prompt
+	tmpPath := os.Getenv(flPasswordPath.EnvVar)
+	if tmpPath != "" {
+		passPathProvided = true
+		passPath = tmpPath
+	}
+
 	for idx, a := range os.Args {
 		switch a {
 		case "--url":
@@ -90,31 +110,59 @@ func init() {
 			if err := f1.Parse([]string{os.Args[idx]}); err == nil {
 				secure = *prti
 			}
-		case "--password":
-			pass = true
-		case "-p":
-			pass = true
+		case "--password", "-p":
+			passPrompt = true
+		case "--Password":
+			passPathProvided = true
+			if len(os.Args) >= idx+2 {
+				if err := f1.Parse(os.Args[idx : idx+2]); err == nil {
+					passPath = *prtPath
+				}
+			}
+		case "-P":
+			passPathProvided = true
+			if len(os.Args) >= idx+2 {
+				if err := f1.Parse(os.Args[idx : idx+2]); err == nil {
+					passPath = *prtP
+				}
+			}
+		case "-h", "--help":
+			help = true
 		}
 	}
-
+	// Static username since username is not supported
+	username := "snapd"
+	password := ""
 	pClient = client.New(url, ver, secure)
-	if pass {
-		// Static username since usernames not supported yet.
-		pClient.Username = "snapd"
+
+	// If we have a pass path and not a pass prompt use the path
+	if passPathProvided && !passPrompt {
+		val, err := ioutil.ReadFile(passPath)
+		if err == nil {
+			password = string(val)
+		}
+	}
+	// if pass prompt  -- use the prompt over all other options
+	if passPrompt {
 		// Prompt for password
 		fmt.Print("Password:")
-		password, err := terminal.ReadPassword(0)
+		pass, err := terminal.ReadPassword(0)
 		if err != nil {
-			pClient.Password = ""
+			password = ""
 		} else {
-			pClient.Password = string(password)
+			password = string(pass)
 		}
 		// Go to next line after password prompt
 		fmt.Println()
 	}
-	resp := pClient.ListAgreements()
-	if resp.Err == nil {
-		commands = append(commands, tribeCommands...)
+	pClient.Username = username
+	pClient.Password = strings.TrimSpace(password)
+	// Send tribe agreement requests only if needed by help
+	if help {
+		resp := pClient.ListAgreements()
+		if resp.Err == nil {
+			commands = append(commands, tribeCommands...)
+		}
 	}
 
 }

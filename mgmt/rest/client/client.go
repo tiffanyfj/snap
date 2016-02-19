@@ -267,6 +267,7 @@ func (c *Client) pluginUploadRequest(pluginPaths []string) (*rbody.APIResponse, 
 	go writePluginToWriter(pw, bufins, writer, paths, errChan)
 
 	req, err := http.NewRequest("POST", c.prefix+"/plugins", pr)
+	addAuth(req, c.Username, c.Password)
 	if err != nil {
 		return nil, err
 	}
