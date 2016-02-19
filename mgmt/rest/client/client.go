@@ -70,7 +70,8 @@ type Client struct {
 	// prefix is the string concatenation of a request URL, forward slash
 	// and the request client version.
 	prefix string
-	// Basic http auth password
+	// Basic http auth username/password
+	Username string
 	Password string
 }
 
@@ -105,9 +106,9 @@ func (t contentType) String() string {
 /*
    Add's auth info to request if password is set.
 */
-func addAuth(req *http.Request, password string) {
+func addAuth(req *http.Request, username, password string) {
 	if password != "" {
-		req.SetBasicAuth("snapd", password)
+		req.SetBasicAuth(username, password)
 	}
 }
 
@@ -129,7 +130,7 @@ func (c *Client) do(method, path string, ct contentType, body ...[]byte) (*rbody
 		if err != nil {
 			return nil, err
 		}
-		addAuth(req, c.Password)
+		addAuth(req, c.Username, c.Password)
 		rsp, err = c.http.Do(req)
 		if err != nil {
 			if strings.Contains(err.Error(), "tls: oversized record") || strings.Contains(err.Error(), "malformed HTTP response") {
@@ -148,7 +149,7 @@ func (c *Client) do(method, path string, ct contentType, body ...[]byte) (*rbody
 		if err != nil {
 			return nil, err
 		}
-		addAuth(req, c.Password)
+		addAuth(req, c.Username, c.Password)
 		req.Header.Add("Content-Type", ct.String())
 
 		rsp, err = c.http.Do(req)
@@ -170,7 +171,7 @@ func (c *Client) do(method, path string, ct contentType, body ...[]byte) (*rbody
 		if err != nil {
 			return nil, err
 		}
-		addAuth(req, c.Password)
+		addAuth(req, c.Username, c.Password)
 		req.Header.Add("Content-Type", "application/json")
 		rsp, err = c.http.Do(req)
 		if err != nil {
@@ -190,7 +191,7 @@ func (c *Client) do(method, path string, ct contentType, body ...[]byte) (*rbody
 		if err != nil {
 			return nil, err
 		}
-		addAuth(req, c.Password)
+		addAuth(req, c.Username, c.Password)
 		req.Header.Add("Content-Type", ct.String())
 		rsp, err = c.http.Do(req)
 		if err != nil {
@@ -205,6 +206,9 @@ func (c *Client) do(method, path string, ct contentType, body ...[]byte) (*rbody
 }
 
 func httpRespToAPIResp(rsp *http.Response) (*rbody.APIResponse, error) {
+	if rsp.StatusCode == 401 {
+		return nil, fmt.Errorf("Invalid credentials")
+	}
 	resp := new(rbody.APIResponse)
 	b, err := ioutil.ReadAll(rsp.Body)
 	rsp.Body.Close()

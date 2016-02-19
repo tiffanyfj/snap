@@ -99,6 +99,8 @@ func init() {
 
 	pClient = client.New(url, ver, secure)
 	if pass {
+		// Static username since usernames not supported yet.
+		pClient.Username = "snapd"
 		// Prompt for password
 		fmt.Print("Password:")
 		password, err := terminal.ReadPassword(0)

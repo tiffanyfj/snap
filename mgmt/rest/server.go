@@ -159,7 +159,6 @@ func (s *Server) Middleware(rw http.ResponseWriter, r *http.Request, next http.H
 			next(rw, r)
 		} else {
 			http.Error(rw, "Not Authorized", 401)
-			restLogger.Fatal(err)
 		}
 	} else {
 		next(rw, r)
