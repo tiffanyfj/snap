@@ -29,6 +29,8 @@ $ $SNAP_PATH/bin/snapctl [global options] command [command options] [arguments..
 --url, -u 'http://localhost:8181'    Sets the URL to use [$SNAP_URL]
 --insecure                           Ignore certificate errors when snap's API is running HTTPS
 --api-version, -a 'v1'               The snap API version
+--password, -p				         Use basic HTTP password authentication
+--Password, -P 			             Provide a path to a file that contains the password to use [$SNAPCTL_PASS_PATH]
 --help, -h                           show help
 --version, -v                        print the version
 ```

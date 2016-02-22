@@ -501,7 +501,7 @@ func action(ctx *cli.Context) {
 				password, err = terminal.ReadPassword(0)
 				fmt.Println()
 				if err != nil {
-					log.Fatal("Failed to get Credentials")
+					log.Fatal("Failed to get credentials")
 				}
 			} else {
 				// restAuthPwd provided in config file

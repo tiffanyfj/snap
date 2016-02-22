@@ -45,12 +45,12 @@ var (
 	}
 	flPassword = cli.BoolFlag{
 		Name:  "password, p",
-		Usage: "Use basic http password auth",
+		Usage: "Password for REST API authentication",
 	}
 	flPasswordPath = cli.StringFlag{
 		Name:   "Password, P",
 		EnvVar: "SNAPCTL_PASS_PATH",
-		Usage:  "Provide a path to a file that contains the password to use",
+		Usage:  "Path to a file that contains the password for REST API authentication",
 		Value:  "",
 	}
 

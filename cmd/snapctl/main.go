@@ -131,7 +131,7 @@ func init() {
 		}
 	}
 	// Static username since username is not supported
-	username := "snapd"
+	username := "snap"
 	password := ""
 	pClient = client.New(url, ver, secure)
 
