@@ -20,6 +20,7 @@ limitations under the License.
 package client
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -78,6 +79,59 @@ func (c *Client) UnloadPlugin(pluginType, name string, version int) *UnloadPlugi
 	return r
 }
 
+// SwapPlugin swaps two plugins with the same type and name e.g. collector:mock:1 with collector:mock:2
+func (c *Client) SwapPlugin(loadPath []string, unloadType, unloadName string, unloadVersion int) *SwapPluginsResult {
+	r := &SwapPluginsResult{}
+
+	// Check if plugin you are trying to unload is loaded
+	var isLoaded bool
+	lps := c.GetPlugins(false)
+	for _, p := range lps.LoadedPlugins {
+		if p.Type == unloadType && p.LoadedPlugin.Name == unloadName && p.LoadedPlugin.Version == unloadVersion {
+			isLoaded = true
+		}
+	}
+	if !isLoaded {
+		r.Err = errors.New("The plugin you are trying to unload is not loaded.")
+		return r
+	}
+	// Load plugin
+	lp := c.LoadPlugin(loadPath)
+	if lp.Err != nil {
+		r.Err = errors.New(lp.Err.Error())
+		return r
+	}
+	if len(lp.LoadedPlugins) != 1 {
+		r.Err = errors.New("There is not just one plugin to be loaded")
+	}
+	lpr := lp.LoadedPlugins[0].LoadedPlugin
+
+	// Make sure both plugins have the same type and name before unloading. If not, rollback.
+	if lpr.Type != unloadType || lpr.Name != unloadName {
+		up := c.UnloadPlugin(lpr.Type, lpr.Name, lpr.Version)
+		if up.Err != nil {
+			r.Err = errors.New("Plugins do not have the same type and name. Failed to rollback after error.")
+			return r
+		}
+		r.Err = errors.New("Plugins do not have the same type and name.")
+		return r
+	}
+	// Unload plugin
+	up := c.UnloadPlugin(unloadType, unloadName, unloadVersion)
+	if up.Err != nil {
+		r.Err = up.Err
+		up2 := c.UnloadPlugin(lpr.Type, lpr.Name, lpr.Version)
+		if up2.Err != nil {
+			r.Err = errors.New("Failed to rollback after error unloading plugin.")
+		}
+		return r
+	}
+	upr := up.PluginUnloaded
+	r.LoadedPlugin = lp.LoadedPlugins[0]
+	r.UnloadedPlugin = upr
+	return r
+}
+
 // GetPlugins returns the loaded and available plugins through an HTTP GET request.
 // By specifying the details flag to tweak output info. An error returns if it failed.
 func (c *Client) GetPlugins(details bool) *GetPluginsResult {
@@ -129,6 +183,12 @@ type LoadPluginResult struct {
 type UnloadPluginResult struct {
 	*rbody.PluginUnloaded
 	Err error
+}
+
+type SwapPluginsResult struct {
+	LoadedPlugin   LoadedPlugin
+	UnloadedPlugin *rbody.PluginUnloaded
+	Err            error
 }
 
 // We wrap this so we can provide some functionality (like LoadedTime)
