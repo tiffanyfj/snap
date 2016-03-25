@@ -207,17 +207,20 @@ func TestSnapClient(t *testing.T) {
 		Convey("Swap with different types should fail", func() {
 			sp := c.SwapPlugin(FILE_PLUGIN_PATH, p1.LoadedPlugins[0].Type, p1.LoadedPlugins[0].Name, p1.LoadedPlugins[0].Version)
 			So(sp.Err, ShouldNotBeNil)
+			So(sp.Err.Error(), ShouldEqual, "Plugins do not have the same type and name.")
 			lps := c.GetPlugins(false)
 			So(len(lps.LoadedPlugins), ShouldEqual, 1)
 		})
 		Convey("Swap with same plugin should fail", func() {
 			sp := c.SwapPlugin(MOCK_PLUGIN_PATH1, p1.LoadedPlugins[0].Type, p1.LoadedPlugins[0].Name, p1.LoadedPlugins[0].Version)
 			So(sp.Err, ShouldNotBeNil)
+			So(sp.Err.Error(), ShouldEqual, "plugin is already loaded")
 			lps := c.GetPlugins(false)
 			So(len(lps.LoadedPlugins), ShouldEqual, 1)
 		})
 		Convey("Swap with plugin that is not loaded should fail", func() {
 			sp := c.SwapPlugin(MOCK_PLUGIN_PATH1, "collector", "mock", 2)
+			So(sp.Err.Error(), ShouldEqual, "plugin not found collector:mock:2")
 			So(sp.Err, ShouldNotBeNil)
 		})
 		Convey("Swap with plugins with the same type and name", func() {

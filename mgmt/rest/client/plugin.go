@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/intelsdi-x/snap/core/serror"
@@ -84,15 +85,9 @@ func (c *Client) SwapPlugin(loadPath []string, unloadType, unloadName string, un
 	r := &SwapPluginsResult{}
 
 	// Check if plugin you are trying to unload is loaded
-	var isLoaded bool
-	lps := c.GetPlugins(false)
-	for _, p := range lps.LoadedPlugins {
-		if p.Type == unloadType && p.LoadedPlugin.Name == unloadName && p.LoadedPlugin.Version == unloadVersion {
-			isLoaded = true
-		}
-	}
-	if !isLoaded {
-		r.Err = errors.New("The plugin you are trying to unload is not loaded.")
+	rp := c.GetPlugin(unloadType, unloadName, unloadVersion)
+	if rp.Err != nil {
+		r.Err = fmt.Errorf("%v %v:%v:%v", rp.Err.Error(), unloadType, unloadName, unloadVersion)
 		return r
 	}
 	// Load plugin
@@ -100,9 +95,6 @@ func (c *Client) SwapPlugin(loadPath []string, unloadType, unloadName string, un
 	if lp.Err != nil {
 		r.Err = errors.New(lp.Err.Error())
 		return r
-	}
-	if len(lp.LoadedPlugins) != 1 {
-		r.Err = errors.New("There is not just one plugin to be loaded")
 	}
 	lpr := lp.LoadedPlugins[0].LoadedPlugin
 
@@ -166,6 +158,39 @@ func (c *Client) GetPlugins(details bool) *GetPluginsResult {
 	return r
 }
 
+// GetPlugin returns the requested plugin through an HTTP GET request. An error returns if it failed.
+func (c *Client) GetPlugin(typ, name string, ver int) *GetPluginResult {
+	r := &GetPluginResult{}
+
+	path := "/plugins/" + typ + "/" + name + "/" + strconv.Itoa(ver)
+
+	resp, err := c.do("GET", path, ContentTypeJSON)
+	if err != nil {
+		r.Err = err
+		return r
+	}
+
+	switch resp.Meta.Type {
+	// TODO change this to concrete const type when Joel adds it
+	case rbody.PluginReturnedType:
+		// Success
+		b := resp.Body.(*rbody.PluginReturned)
+		r.ReturnedPlugin = ReturnedPlugin{b}
+		return r
+	case rbody.ErrorType:
+		r.Err = resp.Body.(*rbody.Error)
+	default:
+		r.Err = ErrAPIResponseMetaType
+	}
+	return r
+}
+
+// GetPluginResult
+type GetPluginResult struct {
+	ReturnedPlugin ReturnedPlugin
+	Err            error
+}
+
 // GetPluginsResult is the response from snap/client on a GetPlugins call.
 type GetPluginsResult struct {
 	LoadedPlugins    []LoadedPlugin
@@ -204,6 +229,11 @@ func (l *LoadedPlugin) LoadedTime() time.Time {
 // The wrapper for AvailablePlugin struct defined inside rbody package.
 type AvailablePlugin struct {
 	*rbody.AvailablePlugin
+}
+
+// The wrapper for ReturnedPlugin struct defined inside rbody package.
+type ReturnedPlugin struct {
+	*rbody.PluginReturned
 }
 
 func convertLoadedPlugins(r []rbody.LoadedPlugin) []LoadedPlugin {
