@@ -1,24 +1,15 @@
 {
-    "log_level": 2,
-    "log_path": "/some/log/dir",
-    "gomaxprocs": 2,
+    "log_level": 1,
     "control": {
-        "auto_discover_path": "/some/directory/with/plugins",
-        "cache_expiration": "750ms",
-        "max_running_plugins": 1,
-        "keyring_paths": "/some/path/with/keyring/files",
         "plugin_trust_level": 0,
         "plugins": {
-            "all": {
-                "password": "p@ssw0rd"
-            },
             "collector": {
                 "all": {
                     "user": "jane"
                 },
-                "pcm": {
+                "mock": {
                     "all": {
-                        "path": "/usr/local/pcm/bin"
+                        "name": "tiffany"
                     },
                     "versions": {
                         "1": {
@@ -28,54 +19,8 @@
                             "somebool": true
                         }
                     }
-                },
-                "psutil": {
-                    "all": {
-                        "path": "/usr/local/bin/psutil"
-                    }
-                }
-            },
-            "publisher": {
-                "influxdb": {
-                    "all": {
-                        "server": "xyz.local",
-                        "password": "$password"
-                    }
-                }
-            },
-            "processor": {
-                "movingaverage": {
-                    "all": {
-                        "user": "jane"
-                    },
-                    "versions": {
-                        "1": {
-                            "user": "tiffany",
-                            "password": "new password"
-                        }
-                    }
                 }
             }
         }
-    },
-    "scheduler": {
-        "work_manager_queue_size": 10,
-        "work_manager_pool_size": 2
-    },
-    "restapi": {
-        "enable": true,
-        "https": true,
-        "rest_auth": true,
-        "rest_auth_password": "changeme",
-        "rest_certificate": "/path/to/cert/file",
-        "rest_key": "/path/to/private/key",
-        "port": 8282
-    },
-    "tribe": {
-        "enable": true,
-        "bind_addr": "127.0.0.1",
-        "bind_port": 16000,
-        "name": "localhost",
-        "seed": "1.1.1.1:16000"
     }
 }

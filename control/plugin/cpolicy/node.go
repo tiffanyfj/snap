@@ -146,6 +146,7 @@ func (p *ConfigPolicyNode) RulesAsTable() []RuleTable {
 			Minimum:  r.Minimum(),
 			Maximum:  r.Maximum(),
 		})
+		fmt.Printf("node.go-RuleAsTable() r.Default(): %v\n", r.Default())
 	}
 	return rt
 }

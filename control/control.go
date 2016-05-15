@@ -828,6 +828,13 @@ func (p *pluginControl) PluginCatalog() core.PluginCatalog {
 	i := 0
 	for _, plugin := range table {
 		plugins[i] = plugin
+		fmt.Println("control.go\n\n")
+
+		thing := plugin.ConfigPolicy.Get([]string{""})
+		table := thing.RulesAsTable()
+		for _, t := range table {
+			fmt.Println("Name:", t.Name, "\nType:", t.Type, "\nDefault:", t.Default)
+		}
 		i++
 	}
 	return plugins

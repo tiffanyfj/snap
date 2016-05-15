@@ -88,7 +88,7 @@ func (f *filePublisher) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	cp := cpolicy.New()
 	config := cpolicy.NewPolicyNode()
 
-	r1, err := cpolicy.NewStringRule("file", true)
+	r1, err := cpolicy.NewStringRule("file", true, "/tmp/somefile")
 	handleErr(err)
 	r1.Description = "Absolute path to the output file for publishing"
 

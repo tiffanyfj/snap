@@ -97,14 +97,40 @@ func (f *Mock) GetMetricTypes(cfg plugin.ConfigType) ([]plugin.MetricType, error
 
 //GetConfigPolicy returns a ConfigPolicyTree for testing
 func (f *Mock) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
-	c := cpolicy.New()
-	rule, _ := cpolicy.NewStringRule("name", false, "bob")
-	rule2, _ := cpolicy.NewStringRule("password", true)
-	p := cpolicy.NewPolicyNode()
-	p.Add(rule)
-	p.Add(rule2)
-	c.Add([]string{"intel", "mock", "foo"}, p)
-	return c, nil
+	// c := cpolicy.New()
+	// rule, _ := cpolicy.NewStringRule("name", false, "bob")
+	// fmt.Printf("mock-GetConfigPolicy(): bob\n")
+	// rule2, _ := cpolicy.NewStringRule("password", true)
+	// p := cpolicy.NewPolicyNode()
+	// p.Add(rule)
+	// p.Add(rule2)
+	// c.Add([]string{"intel", "mock", "foo"}, p)
+	// return c, nil
+	cp := cpolicy.New()
+
+	r1, err := cpolicy.NewStringRule("test", false, "bob")
+	handleErr(err)
+	config := cpolicy.NewPolicyNode()
+	config.Add(r1)
+	cp.Add([]string{""}, config)
+	return cp, nil
+}
+
+// func (p *passthruProcessor) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
+// 	cp := cpolicy.New()
+
+// 	r1, err := cpolicy.NewStringRule("passthru", true, "foobar")
+// 	handleErr(err)
+// 	config := cpolicy.NewPolicyNode()
+// 	config.Add(r1)
+// 	cp.Add([]string{""}, config)
+// 	return cp, nil
+// }
+
+func handleErr(e error) {
+	if e != nil {
+		panic(e)
+	}
 }
 
 //Meta returns meta data for testing

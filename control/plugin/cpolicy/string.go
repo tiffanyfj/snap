@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 
 	"github.com/intelsdi-x/snap/core/ctypes"
 )
@@ -47,6 +48,10 @@ func NewStringRule(key string, req bool, opts ...string) (*StringRule, error) {
 	if len(opts) > 0 {
 		def = &opts[0]
 	}
+	if def != nil {
+		fmt.Printf("string.go-NewStringRule(): %v\n", *def)
+
+	}
 
 	return &StringRule{
 		key:      key,
@@ -61,6 +66,7 @@ func (s *StringRule) Type() string {
 
 // MarshalJSON marshals a StringRule into JSON
 func (s *StringRule) MarshalJSON() ([]byte, error) {
+	fmt.Printf("string.go-MarshalJSON(): %v\n", s.Default())
 	return json.Marshal(&struct {
 		Key      string             `json:"key"`
 		Required bool               `json:"required"`
@@ -130,6 +136,7 @@ func (s *StringRule) Validate(cv ctypes.ConfigValue) error {
 // Returns a default value is it exists.
 func (s *StringRule) Default() ctypes.ConfigValue {
 	if s.default_ != nil {
+		fmt.Printf("string.go-Default(): %v\n", *s.default_)
 		return &ctypes.ConfigValueStr{Value: *s.default_}
 	}
 	return nil

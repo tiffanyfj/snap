@@ -49,7 +49,20 @@ type passthruProcessor struct{}
 
 func (p *passthruProcessor) GetConfigPolicy() (*cpolicy.ConfigPolicy, error) {
 	cp := cpolicy.New()
+	config := cpolicy.NewPolicyNode()
+
+	r1, err := cpolicy.NewStringRule("passthru", true, "foobar")
+	handleErr(err)
+
+	config.Add(r1)
+	cp.Add([]string{""}, config)
 	return cp, nil
+}
+
+func handleErr(e error) {
+	if e != nil {
+		panic(e)
+	}
 }
 
 func (p *passthruProcessor) Process(contentType string, content []byte, config map[string]ctypes.ConfigValue) (string, []byte, error) {

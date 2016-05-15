@@ -42,6 +42,7 @@ import (
 	"github.com/intelsdi-x/snap/control/plugin/client"
 	"github.com/intelsdi-x/snap/control/plugin/cpolicy"
 	"github.com/intelsdi-x/snap/core"
+	"github.com/intelsdi-x/snap/core/ctypes"
 	"github.com/intelsdi-x/snap/core/serror"
 )
 
@@ -354,14 +355,25 @@ func (p *pluginManager) LoadPlugin(details *pluginDetails, emitter gomit.Emitter
 	}
 	lPlugin.ConfigPolicy = cp
 
+	fmt.Println("\n\n==GetConfigPolicy Value==")
+	fmt.Println(resp.Type.String())
+	node := cp.Get([]string{""})
+	table := node.RulesAsTable()
+	for _, t := range table {
+		fmt.Println("Name:", t.Name, "\nType:", t.Type, "\nDefault:", t.Default)
+	}
+	fmt.Println("\n\n\n")
+
 	if resp.Type == plugin.CollectorPluginType {
 		colClient := ap.client.(client.PluginCollectorClient)
-
 		cfg := plugin.ConfigType{
 			ConfigDataNode: p.pluginConfig.getPluginConfigDataNode(core.PluginType(resp.Type), resp.Meta.Name, resp.Meta.Version),
 		}
-
+		blah := ctypes.ConfigValueStr{Value: "bah"}
+		cfg.ConfigDataNode.AddItem("stuff", blah)
+		fmt.Printf("control/plugin_manager.go cfgdatanode: %v\n", cfg.ConfigDataNode.Table())
 		metricTypes, err := colClient.GetMetricTypes(cfg)
+		fmt.Printf("control/plugin_manager.go metricTypes: %v\n", metricTypes)
 		if err != nil {
 			pmLogger.WithFields(log.Fields{
 				"_block":      "load-plugin",

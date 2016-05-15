@@ -360,6 +360,14 @@ func (mc *metricCatalog) AddLoadedMetricType(lp *loadedPlugin, mt core.Metric) e
 		}).Error("error adding loaded metric type")
 		return err
 	}
+	fmt.Printf("control/metrics.go - AddLoadedMetricType %v\n", mt.Namespace().Strings())
+	thing := lp.ConfigPolicy.Get(mt.Namespace().Strings())
+	table := thing.RulesAsTable()
+
+	for _, t := range table {
+		fmt.Println("control/metrics.go - AddLoadedMetricType \nName:", t.Name, "\nType:", t.Type, "\nDefault:", t.Default)
+	}
+
 	newMt := metricType{
 		Plugin:             lp,
 		namespace:          mt.Namespace(),
