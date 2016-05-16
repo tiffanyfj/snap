@@ -186,16 +186,19 @@ func swapPlugins(ctx *cli.Context) {
 	}
 
 	fmt.Println("Plugin loaded")
-	fmt.Printf("Name: %s\n", r.LoadedPlugin.Name)
-	fmt.Printf("Version: %d\n", r.LoadedPlugin.Version)
-	fmt.Printf("Type: %s\n", r.LoadedPlugin.Type)
-	fmt.Printf("Signed: %v\n", r.LoadedPlugin.Signed)
-	fmt.Printf("Loaded Time: %s\n\n", r.LoadedPlugin.LoadedTime().Format(timeFormat))
+	for _, p := range r.SwappedPlugins.PluginsLoaded.LoadedPlugins {
+		fmt.Println("Plugin loaded")
+		fmt.Printf("Name: %s\n", p.Name)
+		fmt.Printf("Version: %d\n", p.Version)
+		fmt.Printf("Type: %s\n", p.Type)
+		fmt.Printf("Signed: %v\n", p.Signed)
+		// fmt.Printf("Loaded Time: %s\n\n", p.LoadedTime().Format(timeFormat))
+	}
 
 	fmt.Println("\nPlugin unloaded")
-	fmt.Printf("Name: %s\n", r.UnloadedPlugin.Name)
-	fmt.Printf("Version: %d\n", r.UnloadedPlugin.Version)
-	fmt.Printf("Type: %s\n", r.UnloadedPlugin.Type)
+	fmt.Printf("Name: %s\n", r.SwappedPlugins.PluginUnloaded.Name)
+	fmt.Printf("Version: %d\n", r.SwappedPlugins.PluginUnloaded.Version)
+	fmt.Printf("Type: %s\n", r.SwappedPlugins.PluginUnloaded.Type)
 }
 
 func listPlugins(ctx *cli.Context) {

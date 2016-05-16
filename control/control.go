@@ -387,10 +387,10 @@ func (p *pluginControl) Unload(pl core.Plugin) (core.CatalogedPlugin, serror.Sna
 	return up, nil
 }
 
-func (p *pluginControl) SwapPlugins(in *core.RequestedPlugin, out core.CatalogedPlugin) serror.SnapError {
+func (p *pluginControl) SwapPlugins(in *core.RequestedPlugin, out core.Plugin) (core.CatalogedPlugin, core.CatalogedPlugin, serror.SnapError) {
 	details, serr := p.returnPluginDetails(in)
 	if serr != nil {
-		return serr
+		return nil, nil, serr
 	}
 	if details.IsPackage {
 		defer os.RemoveAll(filepath.Dir(details.ExecPath))
@@ -398,7 +398,7 @@ func (p *pluginControl) SwapPlugins(in *core.RequestedPlugin, out core.Cataloged
 
 	lp, err := p.pluginManager.LoadPlugin(details, p.eventManager)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	// Make sure plugin types and names are the same
@@ -417,9 +417,9 @@ func (p *pluginControl) SwapPlugins(in *core.RequestedPlugin, out core.Cataloged
 				"original-unload-error": serr.Error(),
 				"rollback-unload-error": err.Error(),
 			})
-			return se
+			return nil, nil, se
 		}
-		return serr
+		return nil, nil, serr
 	}
 
 	up, err := p.pluginManager.UnloadPlugin(out)
@@ -431,9 +431,9 @@ func (p *pluginControl) SwapPlugins(in *core.RequestedPlugin, out core.Cataloged
 				"original-unload-error": err.Error(),
 				"rollback-unload-error": err2.Error(),
 			})
-			return se
+			return nil, nil, se
 		}
-		return err
+		return nil, nil, err
 	}
 
 	event := &control_event.SwapPluginsEvent{
@@ -445,7 +445,7 @@ func (p *pluginControl) SwapPlugins(in *core.RequestedPlugin, out core.Cataloged
 	}
 	defer p.eventManager.Emit(event)
 
-	return nil
+	return lp, up, nil
 }
 
 // MatchQueryToNamespaces performs the process of matching the 'ns' with namespaces of all cataloged metrics

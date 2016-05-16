@@ -126,6 +126,7 @@ type managesMetrics interface {
 	GetMetric(core.Namespace, int) (core.CatalogedMetric, error)
 	Load(*core.RequestedPlugin) (core.CatalogedPlugin, serror.SnapError)
 	Unload(core.Plugin) (core.CatalogedPlugin, serror.SnapError)
+	SwapPlugins(in *core.RequestedPlugin, out core.Plugin) (core.CatalogedPlugin, core.CatalogedPlugin, serror.SnapError)
 	PluginCatalog() core.PluginCatalog
 	AvailablePlugins() []core.AvailablePlugin
 	GetAutodiscoverPaths() []string
@@ -418,6 +419,7 @@ func (s *Server) addRoutes() {
 	s.r.GET("/v1/plugins/:type/:name/:version", s.getPlugin)
 	s.r.POST("/v1/plugins", s.loadPlugin)
 	s.r.DELETE("/v1/plugins/:type/:name/:version", s.unloadPlugin)
+	s.r.PUT("/v1/plugins/:type/:name/:version", s.swapPlugins)
 	s.r.GET("/v1/plugins/:type/:name/:version/config", s.getPluginConfigItem)
 	s.r.PUT("/v1/plugins/:type/:name/:version/config", s.setPluginConfigItem)
 	s.r.DELETE("/v1/plugins/:type/:name/:version/config", s.deletePluginConfigItem)

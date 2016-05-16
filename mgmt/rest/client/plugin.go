@@ -20,7 +20,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -83,45 +82,66 @@ func (c *Client) UnloadPlugin(pluginType, name string, version int) *UnloadPlugi
 // SwapPlugin swaps two plugins with the same type and name e.g. collector:mock:1 with collector:mock:2
 func (c *Client) SwapPlugin(loadPath []string, unloadType, unloadName string, unloadVersion int) *SwapPluginsResult {
 	r := &SwapPluginsResult{}
-
-	// Check if plugin you are trying to unload is loaded
-	rp := c.GetPlugin(unloadType, unloadName, unloadVersion)
-	if rp.Err != nil {
-		r.Err = fmt.Errorf("%v %v:%v:%v", rp.Err.Error(), unloadType, unloadName, unloadVersion)
+	resp, err := c.do("PUT", fmt.Sprintf("/plugins/%s/%s/%d", unloadType, url.QueryEscape(unloadName), unloadVersion), ContentTypeJSON)
+	if err != nil {
+		r.Err = err
 		return r
 	}
-	// Load plugin
-	lp := c.LoadPlugin(loadPath)
-	if lp.Err != nil {
-		r.Err = errors.New(lp.Err.Error())
-		return r
-	}
-	lpr := lp.LoadedPlugins[0].LoadedPlugin
-
-	// Make sure both plugins have the same type and name before unloading. If not, rollback.
-	if lpr.Type != unloadType || lpr.Name != unloadName {
-		up := c.UnloadPlugin(lpr.Type, lpr.Name, lpr.Version)
-		if up.Err != nil {
-			r.Err = errors.New("Plugins do not have the same type and name. Failed to rollback after error.")
-			return r
+	switch resp.Meta.Type {
+	case rbody.PluginsSwappedType:
+		sp := resp.Body.(*rbody.PluginsSwapped)
+		// pl := resp.Body.(*rbody.PluginsLoaded)
+		// r.SwappedPlugins.PluginsLoaded = convertLoadedPlugins(pl.LoadedPlugins)
+		// r.SwappedPlugins.PluginUnloaded = &UnloadPluginResult{up, nil}
+		r = &SwapPluginsResult{sp, nil}
+	case rbody.ErrorType:
+		f := resp.Body.(*rbody.Error).Fields
+		fields := make(map[string]interface{})
+		for k, v := range f {
+			fields[k] = v
 		}
-		r.Err = errors.New("Plugins do not have the same type and name.")
-		return r
+		r.Err = serror.New(resp.Body.(*rbody.Error), fields)
+	default:
+		r.Err = serror.New(ErrAPIResponseMetaType)
 	}
-	// Unload plugin
-	up := c.UnloadPlugin(unloadType, unloadName, unloadVersion)
-	if up.Err != nil {
-		r.Err = up.Err
-		up2 := c.UnloadPlugin(lpr.Type, lpr.Name, lpr.Version)
-		if up2.Err != nil {
-			r.Err = errors.New("Failed to rollback after error unloading plugin.")
-		}
-		return r
-	}
-	upr := up.PluginUnloaded
-	r.LoadedPlugin = lp.LoadedPlugins[0]
-	r.UnloadedPlugin = upr
 	return r
+	// Check if plugin you are trying to unload is loaded
+	// rp := c.GetPlugin(unloadType, unloadName, unloadVersion)
+	// if rp.Err != nil {
+	// 	r.Err = fmt.Errorf("%v %v:%v:%v", rp.Err.Error(), unloadType, unloadName, unloadVersion)
+	// 	return r
+	// }
+	// // Load plugin
+	// lp := c.LoadPlugin(loadPath)
+	// if lp.Err != nil {
+	// 	r.Err = errors.New(lp.Err.Error())
+	// 	return r
+	// }
+	// lpr := lp.LoadedPlugins[0].LoadedPlugin
+
+	// // Make sure both plugins have the same type and name before unloading. If not, rollback.
+	// if lpr.Type != unloadType || lpr.Name != unloadName {
+	// 	up := c.UnloadPlugin(lpr.Type, lpr.Name, lpr.Version)
+	// 	if up.Err != nil {
+	// 		r.Err = errors.New("Plugins do not have the same type and name. Failed to rollback after error.")
+	// 		return r
+	// 	}
+	// 	r.Err = errors.New("Plugins do not have the same type and name.")
+	// 	return r
+	// }
+	// // Unload plugin
+	// up := c.UnloadPlugin(unloadType, unloadName, unloadVersion)
+	// if up.Err != nil {
+	// 	r.Err = up.Err
+	// 	up2 := c.UnloadPlugin(lpr.Type, lpr.Name, lpr.Version)
+	// 	if up2.Err != nil {
+	// 		r.Err = errors.New("Failed to rollback after error unloading plugin.")
+	// 	}
+	// 	return r
+	// }
+	// upr := up.PluginUnloaded
+	// r.LoadedPlugin = lp.LoadedPlugins[0]
+	// r.UnloadedPlugin = upr
 }
 
 // GetPlugins returns the loaded and available plugins through an HTTP GET request.
@@ -210,16 +230,24 @@ type UnloadPluginResult struct {
 	Err error
 }
 
-type SwapPluginsResult struct {
-	LoadedPlugin   LoadedPlugin
-	UnloadedPlugin *rbody.PluginUnloaded
-	Err            error
-}
-
 // We wrap this so we can provide some functionality (like LoadedTime)
 type LoadedPlugin struct {
 	*rbody.LoadedPlugin
 }
+
+// type SwapPluginsResult struct {
+// 	LoadPluginResult   LoadPluginResult
+// 	UnloadPluginResult UnloadPluginResult
+// }
+
+type SwapPluginsResult struct {
+	SwappedPlugins *rbody.PluginsSwapped
+	Err            error
+}
+
+// type SwappedPlugins struct {
+// 	*rbody.PluginsSwapped
+// }
 
 // LoadedTime returns a unix time.
 func (l *LoadedPlugin) LoadedTime() time.Time {

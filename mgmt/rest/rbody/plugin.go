@@ -27,6 +27,7 @@ import (
 const (
 	PluginsLoadedType  = "plugins_loaded"
 	PluginUnloadedType = "plugin_unloaded"
+	PluginsSwappedType = "plugins_swapped"
 	PluginListType     = "plugin_list_returned"
 	PluginReturnedType = "plugin_returned"
 )
@@ -107,4 +108,24 @@ type AvailablePlugin struct {
 	LastHitTimestamp int64  `json:"last_hit_timestamp"`
 	ID               uint32 `json:"id"`
 	Href             string `json:"href"`
+}
+
+type PluginsSwapped struct {
+	PluginsLoaded  PluginsLoaded  `json:"plugins_loaded"`
+	PluginUnloaded PluginUnloaded `json:"plugin_unloaded"`
+}
+
+func (s *PluginsSwapped) ResponseBodyType() string {
+	return PluginsSwappedType
+}
+
+func (s *PluginsSwapped) ResponseBodyMessage() string {
+	str := "Plugins loaded: "
+	l := make([]string, len(s.PluginsLoaded.LoadedPlugins))
+	for i, pl := range s.PluginsLoaded.LoadedPlugins {
+		l[i] = fmt.Sprintf("%s(%s v%d)", pl.Name, pl.Type, pl.Version)
+	}
+	l = append(l, fmt.Sprintf("Plugin successfully unloaded (%sv%d)", s.PluginUnloaded.Name, s.PluginUnloaded.Version))
+	str += strings.Join(l, ", ")
+	return str
 }

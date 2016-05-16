@@ -259,6 +259,182 @@ func (s *Server) unloadPlugin(w http.ResponseWriter, r *http.Request, p httprout
 	respond(200, pr, w)
 }
 
+func (s *Server) swapPlugins(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil {
+		respond(500, rbody.FromError(err), w)
+		return
+	}
+	if strings.HasPrefix(mediaType, "multipart/") {
+		var pluginPath string
+		var signature []byte
+		var checkSum [sha256.Size]byte
+		lp := &rbody.PluginsLoaded{}
+		lp.LoadedPlugins = make([]rbody.LoadedPlugin, 0)
+		mr := multipart.NewReader(r.Body, params["boundary"])
+		var i int
+		for {
+			var b []byte
+			p, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				respond(500, rbody.FromError(err), w)
+				return
+			}
+			if r.Header.Get("Plugin-Compression") == "gzip" {
+				g, err := gzip.NewReader(p)
+				defer g.Close()
+				if err != nil {
+					respond(500, rbody.FromError(err), w)
+					return
+				}
+				b, err = ioutil.ReadAll(g)
+				if err != nil {
+					respond(500, rbody.FromError(err), w)
+					return
+				}
+			} else {
+				b, err = ioutil.ReadAll(p)
+				if err != nil {
+					respond(500, rbody.FromError(err), w)
+					return
+				}
+			}
+
+			// A little sanity checking for files being passed into the API server.
+			// First file passed in should be the plugin. If the first file is a signature
+			// file, an error is returned. The signature file should be the second
+			// file passed to the API server. If the second file does not have the ".asc"
+			// extension, an error is returned.
+			// If we loop around more than twice before receiving io.EOF, then
+			// an error is returned.
+
+			switch {
+			case i == 0:
+				if filepath.Ext(p.FileName()) == ".asc" {
+					e := errors.New("Error: first file passed to load plugin api can not be signature file")
+					respond(500, rbody.FromError(e), w)
+					return
+				}
+				if pluginPath, err = writeFile(p.FileName(), b); err != nil {
+					respond(500, rbody.FromError(err), w)
+					return
+				}
+				checkSum = sha256.Sum256(b)
+			case i == 1:
+				if filepath.Ext(p.FileName()) == ".asc" {
+					signature = b
+				} else {
+					e := errors.New("Error: second file passed was not a signature file")
+					respond(500, rbody.FromError(e), w)
+					return
+				}
+			case i == 2:
+				e := errors.New("Error: More than two files passed to the load plugin api")
+				respond(500, rbody.FromError(e), w)
+				return
+			}
+			i++
+		}
+		rp, err := core.NewRequestedPlugin(pluginPath)
+		if err != nil {
+			respond(500, rbody.FromError(err), w)
+			return
+		}
+		// Sanity check, verify the checkSum on the file sent is the same
+		// as after it is written to disk.
+		if rp.CheckSum() != checkSum {
+			e := errors.New("Error: CheckSum mismatch on requested plugin to load")
+			respond(500, rbody.FromError(e), w)
+			return
+		}
+		rp.SetSignature(signature)
+		restLogger.Info("Loading plugin: ", rp.Path())
+
+		//
+		plName := p.ByName("name")
+		plType := p.ByName("type")
+		plVersion, iErr := strconv.ParseInt(p.ByName("version"), 10, 0)
+		f := map[string]interface{}{
+			"plugin-name":    plName,
+			"plugin-version": plVersion,
+			"plugin-type":    plType,
+		}
+
+		if iErr != nil {
+			se := serror.New(errors.New("invalid version"))
+			se.SetFields(f)
+			respond(400, rbody.FromSnapError(se), w)
+			return
+		}
+
+		if plName == "" {
+			se := serror.New(errors.New("missing plugin name"))
+			se.SetFields(f)
+			respond(400, rbody.FromSnapError(se), w)
+			return
+		}
+		if plType == "" {
+			se := serror.New(errors.New("missing plugin type"))
+			se.SetFields(f)
+			respond(400, rbody.FromSnapError(se), w)
+			return
+		}
+		// up, se := s.mm.Unload(&plugin{
+		// 	name:       plName,
+		// 	version:    int(plVersion),
+		// 	pluginType: plType,
+		// })
+		// if se != nil {
+		// 	se.SetFields(f)
+		// 	respond(500, rbody.FromSnapError(se), w)
+		// 	return
+		// }
+
+		// pl, err := s.mm.Load(rp) //TODO
+
+		pl, up, se := s.mm.SwapPlugins(rp, &plugin{
+			name:       plName,
+			version:    int(plVersion),
+			pluginType: plType,
+		})
+		if se != nil {
+			var ec int
+			restLogger.Error(err)
+			restLogger.Debugf("Removing file (%s)", rp.Path())
+			err2 := os.RemoveAll(filepath.Dir(rp.Path()))
+			if err2 != nil {
+				restLogger.Error(err2)
+			}
+			rb := rbody.FromError(err)
+			switch rb.ResponseBodyMessage() {
+			case PluginAlreadyLoaded:
+				ec = 409
+			default:
+				ec = 500
+			}
+			respond(ec, rb, w)
+			return
+		}
+		lp.LoadedPlugins = append(lp.LoadedPlugins, *catalogedPluginToLoaded(r.Host, pl))
+		sp := &rbody.PluginsSwapped{
+			PluginUnloaded: rbody.PluginUnloaded{
+				Name:    up.Name(),
+				Version: up.Version(),
+				Type:    up.TypeName(),
+			},
+			PluginsLoaded: rbody.PluginsLoaded{LoadedPlugins: lp.LoadedPlugins},
+		}
+		// respond(200, pr, w)
+
+		// &rbody.SwappedPlugins.LoadedPlugin = lp
+		respond(201, sp, w)
+	}
+
+}
+
 func (s *Server) getPlugins(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	var detail bool
 	for k := range r.URL.Query() {
