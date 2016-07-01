@@ -96,6 +96,7 @@ func listMetrics(ctx *cli.Context) {
 }
 
 func getMetric(ctx *cli.Context) {
+	var metrics []*rbody.Metric
 	if !ctx.IsSet("metric-namespace") {
 		fmt.Println("namespace is required")
 		fmt.Println("")
@@ -104,11 +105,21 @@ func getMetric(ctx *cli.Context) {
 	}
 	ns := ctx.String("metric-namespace")
 	ver := ctx.Int("metric-version")
-	metric := pClient.GetMetric(ns, ver)
-	if metric.Err != nil {
-		fmt.Println(metric.Err)
+	if string(ns[len(ns)-1]) == "*" {
+		mts := pClient.FetchMetrics("/intel/mock", ver)
+		if mts.Err != nil {
+			fmt.Println(mts.Err)
+			return
+		}
+		metrics = append(metrics, mts.Catalog...)
+	}
+
+	mt := pClient.GetMetric(ns, ver)
+	if mt.Err != nil {
+		fmt.Println(mt.Err)
 		return
 	}
+	metrics = append(metrics, mt.Metric)
 
 	/*
 		NAMESPACE                VERSION         LAST ADVERTISED TIME
@@ -121,40 +132,41 @@ func getMetric(ctx *cli.Context) {
 		     password    string                          true
 		     portRange   int                             false        9000      10000
 	*/
+	for _, metric := range metrics {
+		namespace := getNamespace(metric)
 
-	namespace := getNamespace(metric.Metric)
+		w := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', 0)
+		printFields(w, false, 0, "NAMESPACE", "VERSION", "UNIT", "LAST ADVERTISED TIME", "DESCRIPTION")
+		printFields(w, false, 0, namespace, metric.Version, metric.Unit, time.Unix(metric.LastAdvertisedTimestamp, 0).Format(time.RFC1123), metric.Description)
+		w.Flush()
+		if metric.Dynamic {
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', 0)
-	printFields(w, false, 0, "NAMESPACE", "VERSION", "UNIT", "LAST ADVERTISED TIME", "DESCRIPTION")
-	printFields(w, false, 0, namespace, metric.Metric.Version, metric.Metric.Unit, time.Unix(metric.Metric.LastAdvertisedTimestamp, 0).Format(time.RFC1123), metric.Metric.Description)
-	w.Flush()
-	if metric.Metric.Dynamic {
+			//	NAMESPACE                VERSION     UNIT        LAST ADVERTISED TIME            DESCRIPTION
+			//	/intel/mock/[host]/baz   2           mock unit   Wed, 09 Sep 2015 10:01:04 PDT   mock description
+			//
+			//	  Dynamic elements of namespace: /intel/mock/[host]/baz
+			//
+			//           NAME        DESCRIPTION
+			//           host        name of the host
+			//
+			//	  Rules for collecting /intel/mock/[host]/baz:
+			//
+			//	     NAME        TYPE            DEFAULT         REQUIRED     MINIMUM   MAXIMUM
 
-		//	NAMESPACE                VERSION     UNIT        LAST ADVERTISED TIME            DESCRIPTION
-		//	/intel/mock/[host]/baz   2           mock unit   Wed, 09 Sep 2015 10:01:04 PDT   mock description
-		//
-		//	  Dynamic elements of namespace: /intel/mock/[host]/baz
-		//
-		//           NAME        DESCRIPTION
-		//           host        name of the host
-		//
-		//	  Rules for collecting /intel/mock/[host]/baz:
-		//
-		//	     NAME        TYPE            DEFAULT         REQUIRED     MINIMUM   MAXIMUM
-
-		fmt.Printf("\n  Dynamic elements of namespace: %s\n\n", namespace)
-		printFields(w, true, 6, "NAME", "DESCRIPTION")
-		for _, v := range metric.Metric.DynamicElements {
-			printFields(w, true, 6, v.Name, v.Description)
+			fmt.Printf("\n  Dynamic elements of namespace: %s\n\n", namespace)
+			printFields(w, true, 6, "NAME", "DESCRIPTION")
+			for _, v := range metric.DynamicElements {
+				printFields(w, true, 6, v.Name, v.Description)
+			}
+			w.Flush()
+		}
+		fmt.Printf("\n  Rules for collecting %s:\n\n", namespace)
+		printFields(w, true, 6, "NAME", "TYPE", "DEFAULT", "REQUIRED", "MINIMUM", "MAXIMUM")
+		for _, rule := range metric.Policy {
+			printFields(w, true, 6, rule.Name, rule.Type, rule.Default, rule.Required, rule.Minimum, rule.Maximum)
 		}
 		w.Flush()
 	}
-	fmt.Printf("\n  Rules for collecting %s:\n\n", namespace)
-	printFields(w, true, 6, "NAME", "TYPE", "DEFAULT", "REQUIRED", "MINIMUM", "MAXIMUM")
-	for _, rule := range metric.Metric.Policy {
-		printFields(w, true, 6, rule.Name, rule.Type, rule.Default, rule.Required, rule.Minimum, rule.Maximum)
-	}
-	w.Flush()
 }
 
 func getNamespace(mt *rbody.Metric) string {
